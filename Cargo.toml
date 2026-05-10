@@ -1,7 +1,13 @@
 [package]
 name = "audrey2"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+description = "A scriptable feed aggregator with a queryable local SQLite store."
+license = "MIT"
+repository = "https://github.com/blockhackersio/audrey2"
+readme = "README.md"
+keywords = ["rss", "atom", "feed", "cli", "aggregator"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 anyhow = "1.0.102"
