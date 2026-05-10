@@ -1,5 +1,7 @@
 # audrey2
 
+> "Feed me Seymour, feed me now!"
+
 A small, scriptable feed aggregator that keeps every entry in a local SQLite database you can query, tag, and pipe into other tools. RSS, Atom, and JSON Feed in; tab-separated values, JSON, or plain text out.
 
 audrey2 is built for people who already live on the command line. There's no TUI, no daemon, and no config file — just a CLI and a database. Subscribe to feeds, sync them when you want new entries, and use a small query language to find things and tag them.
