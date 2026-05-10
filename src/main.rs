@@ -1,7 +1,7 @@
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use feed_rs::parser;
-use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS feeds (slug TEXT PRIMARY KEY, url TEXT UNIQUE NOT NULL, title TEXT, last_sync INTEGER);
@@ -99,6 +99,8 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// List all tags with counts
+    Tags,
     /// Delete entries older than a duration (e.g. 2w, 6m, 1y)
     Gc {
         /// Duration: NUMBER + h/d/w/m/y
@@ -129,7 +131,11 @@ fn slugify(s: &str) -> String {
         }
     }
     let r = out.trim_matches('-').to_string();
-    if r.is_empty() { "feed".into() } else { r }
+    if r.is_empty() {
+        "feed".into()
+    } else {
+        r
+    }
 }
 
 fn unique_slug(c: &Connection, base: &str) -> Result<String> {
@@ -504,6 +510,15 @@ fn main() -> Result<()> {
                 }
             }
             println!("{} entries updated", ids.len());
+        }
+        Cmd::Tags => {
+            let mut stmt =
+                c.prepare("SELECT tag, COUNT(*) FROM tags GROUP BY tag ORDER BY 2 DESC, tag")?;
+            let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?;
+            for row in rows {
+                let (tag, n) = row?;
+                println!("{}\t{}", n, tag);
+            }
         }
         Cmd::Gc { duration } => {
             let cutoff = now() - parse_dur(&duration)?;
