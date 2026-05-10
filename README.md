@@ -1,16 +1,16 @@
-# audrey22
+# audrey2
 
 A small, scriptable feed aggregator that keeps every entry in a local SQLite database you can query, tag, and pipe into other tools. RSS, Atom, and JSON Feed in; tab-separated values, JSON, or plain text out.
 
-audrey22 is built for people who already live on the command line. There's no TUI, no daemon, and no config file — just a CLI (`audrey2`) and a database. Subscribe to feeds, sync them when you want new entries, and use a small query language to find things and tag them.
+audrey2 is built for people who already live on the command line. There's no TUI, no daemon, and no config file — just a CLI (`audrey2`) and a database. Subscribe to feeds, sync them when you want new entries, and use a small query language to find things and tag them.
 
 ## Why
 
-Most feed readers want to be the place you read. audrey22 doesn't. It's a stable local cache of your subscriptions that plays nicely with `grep`, `xargs`, `fzf`, cron, and shell scripts. If you'd rather glue together your own reading workflow than adopt someone else's, this is the shape of tool you want.
+Most feed readers want to be the place you read. audrey2 doesn't. It's a stable local cache of your subscriptions that plays nicely with `grep`, `xargs`, `fzf`, cron, and shell scripts. If you'd rather glue together your own reading workflow than adopt someone else's, this is the shape of tool you want.
 
 ## Install
 
-audrey22 is a Rust project. With a Rust toolchain installed:
+audrey2 is a Rust project. With a Rust toolchain installed:
 
 ```
 cargo install --path .
@@ -47,7 +47,7 @@ Every command takes a slug, a URL, or a unique slug prefix wherever a feed ident
 
 ### `add URL [--as SLUG]`
 
-Subscribes to a feed and immediately fetches its current entries. The slug is generated from the feed's title (lowercased, non-alphanumeric collapsed to dashes) unless you pass `--as`. If the auto-generated slug collides with an existing one, audrey22 appends `-2`, `-3`, etc.
+Subscribes to a feed and immediately fetches its current entries. The slug is generated from the feed's title (lowercased, non-alphanumeric collapsed to dashes) unless you pass `--as`. If the auto-generated slug collides with an existing one, audrey2 appends `-2`, `-3`, etc.
 
 ```
 audrey2 add https://example.com/feed.xml --as example
