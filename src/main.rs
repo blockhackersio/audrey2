@@ -93,6 +93,8 @@ enum Cmd {
     /// Add or remove tags on entries matching a query
     ///
     /// Args: one or more +TAG / -TAG ops, then query tokens.
+    /// At least one query token is required — bare `tag +foo`
+    /// (no query) is refused to prevent tagging every entry.
     /// Example: audrey2 tag +starred -unread tag:rust feed:lwn
     Tag {
         /// +TAG to add, -TAG to remove, then query tokens
@@ -105,6 +107,18 @@ enum Cmd {
     Gc {
         /// Duration: NUMBER + h/d/w/m/y
         duration: String,
+    },
+    /// Export selected entries to a directory of markdown notes
+    ///
+    /// Writes <DIR>/<feed>/<id>.md per id with YAML frontmatter.
+    /// Files are only rewritten if their content has changed.
+    /// Clears the 'unread' tag on each exported entry.
+    ExportMarkdown {
+        /// Output directory (created if missing)
+        dir: std::path::PathBuf,
+        /// Entry ids to export (from `audrey2 search`)
+        #[arg(required = true)]
+        ids: Vec<i64>,
     },
 }
 
@@ -350,6 +364,31 @@ fn fmt_date(t: i64) -> String {
         .unwrap_or_default()
 }
 
+fn render_markdown(
+    id: i64,
+    feed: &str,
+    published: i64,
+    tags: &[String],
+    title: &str,
+    url: &str,
+    body: &str,
+) -> String {
+    let esc = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
+    let mut out = String::from("---\n");
+    out.push_str(&format!("audrey_id: {}\n", id));
+    out.push_str(&format!("feed: \"{}\"\n", esc(feed)));
+    out.push_str(&format!("published: \"{}\"\n", fmt_date(published)));
+    out.push_str("tags:\n");
+    for t in tags {
+        out.push_str(&format!("  - {}\n", t));
+    }
+    out.push_str(&format!("title: \"{}\"\n", esc(title)));
+    out.push_str(&format!("url: \"{}\"\n", esc(url)));
+    out.push_str("---\n\n");
+    out.push_str(&format!("# {}\n\n<{}>\n\n{}\n", title, url, body));
+    out
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let c = db()?;
@@ -490,6 +529,12 @@ fn main() -> Result<()> {
             if ops.is_empty() {
                 bail!("no tag ops (use +foo or -bar)");
             }
+            if rest.is_empty() {
+                bail!(
+                    "refusing to tag every entry: provide at least one query token \
+                     (e.g. tag:..., feed:..., before:..., or a search word)"
+                );
+            }
             let (w, ps) = build_query(&rest)?;
             let sql = format!("SELECT e.id FROM entries e WHERE {}", w);
             let mut stmt = c.prepare(&sql)?;
@@ -528,6 +573,71 @@ fn main() -> Result<()> {
             )?;
             let m = c.execute("DELETE FROM entries WHERE published < ?", [cutoff])?;
             println!("deleted {} entries", m);
+        }
+
+        Cmd::ExportMarkdown { dir, ids } => {
+            std::fs::create_dir_all(&dir)?;
+            let (mut wrote, mut skipped, mut missing) = (0u32, 0u32, 0u32);
+
+            for id in ids {
+                let row: Option<(String, String, String, String, String, i64)> = c
+                    .query_row(
+                        "SELECT feed_slug, title, url, summary, content, published \
+                         FROM entries WHERE id = ?",
+                        [id],
+                        |r| {
+                            Ok((
+                                r.get(0)?,
+                                r.get(1)?,
+                                r.get(2)?,
+                                r.get(3)?,
+                                r.get(4)?,
+                                r.get(5)?,
+                            ))
+                        },
+                    )
+                    .optional()?;
+                let Some((feed, title, url, summary, content, published)) = row else {
+                    eprintln!("not found: {}", id);
+                    missing += 1;
+                    continue;
+                };
+
+                let mut tag_stmt =
+                    c.prepare("SELECT tag FROM tags WHERE entry_id = ? ORDER BY tag")?;
+                let tags: Vec<String> = tag_stmt
+                    .query_map([id], |r| r.get::<_, String>(0))?
+                    .collect::<rusqlite::Result<_>>()?;
+
+                let feed_dir = dir.join(&feed);
+                std::fs::create_dir_all(&feed_dir)?;
+                let path = feed_dir.join(format!("{}.md", id));
+
+                let body = if !content.is_empty() {
+                    content
+                } else {
+                    summary
+                };
+                let new = render_markdown(id, &feed, published, &tags, &title, &url, &body);
+
+                match std::fs::read_to_string(&path) {
+                    Ok(existing) if existing == new => skipped += 1,
+                    _ => {
+                        std::fs::write(&path, new)?;
+                        wrote += 1;
+                    }
+                }
+
+                c.execute(
+                    "DELETE FROM tags WHERE entry_id = ? AND tag = 'unread'",
+                    [id],
+                )?;
+            }
+
+            println!(
+                "wrote {}, skipped {} (unchanged), missing {}",
+                wrote, skipped, missing
+            );
         }
     }
     Ok(())

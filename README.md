@@ -92,9 +92,11 @@ audrey2 search -c date,feed,title rust after:3d
 
 Prints one entry to stdout and removes its `unread` tag. Body is HTML-stripped by default; `--html` keeps it raw. `--open` opens the entry's URL in a browser instead and leaves the tag.
 
-### `tag [+TAG | -TAG ...] [QUERY...]`
+### `tag [+TAG | -TAG ...] QUERY...`
 
 Adds or removes tags on entries matching a query. Operations come first, then query tokens. `+name` adds, `-name` removes. Multiple operations may be combined.
+
+At least one query token is required. Running `tag` with only operations and no query is refused, to prevent accidentally tagging every entry. To genuinely apply a tag to all entries, use a query that matches everything explicitly, e.g. `before:100y`.
 
 ```
 audrey2 tag +starred title:"release notes"
@@ -120,6 +122,17 @@ Deletes entries (and their tags) older than the given duration.
 
 ```
 audrey2 gc 6m
+```
+
+### `export-markdown DIR [--prune]`
+
+Writes one markdown note per entry to `DIR/<feed_slug>/<id>.md` with YAML frontmatter (`audrey_id`, `feed`, `published`, `tags`, `title`, `url`) and the entry body. Filenames use the entry id, which is stable. Files are only rewritten if their content has changed.
+
+`--prune` deletes notes under `DIR` whose entry ids are no longer in the database.
+
+```
+audrey2 export-markdown ~/notes/audrey
+audrey2 export-markdown ~/notes/audrey --prune
 ```
 
 ## Examples
