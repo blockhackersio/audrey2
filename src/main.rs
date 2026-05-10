@@ -108,16 +108,16 @@ enum Cmd {
         /// Duration: NUMBER + h/d/w/m/y
         duration: String,
     },
-    /// Export selected entries to a directory of markdown notes
+    /// Export entries to a directory of markdown notes
     ///
     /// Writes <DIR>/<feed>/<id>.md per id with YAML frontmatter.
     /// Files are only rewritten if their content has changed.
     /// Clears the 'unread' tag on each exported entry.
+    /// With no ids, exports every entry in the database.
     ExportMarkdown {
         /// Output directory (created if missing)
         dir: std::path::PathBuf,
-        /// Entry ids to export (from `audrey2 search`)
-        #[arg(required = true)]
+        /// Entry ids to export (from `audrey2 search`); omit for all
         ids: Vec<i64>,
     },
 }
@@ -577,9 +577,17 @@ fn main() -> Result<()> {
 
         Cmd::ExportMarkdown { dir, ids } => {
             std::fs::create_dir_all(&dir)?;
+            let target_ids: Vec<i64> = if ids.is_empty() {
+                c.prepare("SELECT id FROM entries ORDER BY id")?
+                    .query_map([], |r| r.get::<_, i64>(0))?
+                    .collect::<rusqlite::Result<_>>()?
+            } else {
+                ids
+            };
+
             let (mut wrote, mut skipped, mut missing) = (0u32, 0u32, 0u32);
 
-            for id in ids {
+            for id in target_ids {
                 let row: Option<(String, String, String, String, String, i64)> = c
                     .query_row(
                         "SELECT feed_slug, title, url, summary, content, published \
